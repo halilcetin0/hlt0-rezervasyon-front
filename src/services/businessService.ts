@@ -43,6 +43,21 @@ export const businessService = {
     const response = await api.get('/businesses/me');
     return response.data;
   },
+
+  createBusiness: async (data: {
+    name: string;
+    description?: string;
+    category: string;
+    address: string;
+    city: string;
+    businessType: string;
+    phone: string;
+    email: string;
+    imageUrl?: string;
+  }): Promise<ApiResponse<Business>> => {
+    const response = await api.post('/businesses', data);
+    return response.data;
+  },
 };
 
 

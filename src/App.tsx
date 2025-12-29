@@ -13,6 +13,7 @@ import BusinessDashboard from '@/pages/BusinessDashboard';
 import ServiceManagement from '@/pages/ServiceManagement';
 import EmployeeManagement from '@/pages/EmployeeManagement';
 import BusinessProfile from '@/pages/BusinessProfile';
+import AcceptInvitation from '@/pages/AcceptInvitation';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/accept-invitation" element={<AcceptInvitation />} />
       
       {/* Protected routes */}
       <Route

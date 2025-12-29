@@ -33,27 +33,57 @@ export default function ServiceManagement() {
   const [showForm, setShowForm] = useState(false);
 
   // Get user's business
-  const { data: businessResponse } = useQuery({
+  const { data: businessResponse, isLoading: businessLoading } = useQuery({
     queryKey: ['my-business'],
     queryFn: async () => {
       try {
-        // Try /businesses/me first
-        try {
-          const response = await businessService.getMyBusiness();
-          return response.data;
-        } catch (error: any) {
-          // Fallback: get all businesses and find by ownerId
-          const businesses = await businessService.getBusinesses();
-          return businesses.data?.find((b: any) => b.ownerId === user?.id) || businesses.data?.[0];
-        }
+        const response = await businessService.getMyBusiness();
+        return { hasBusiness: true, business: response.data };
       } catch (error: any) {
-        return null;
+        // 404 means no business exists
+        if (error.response?.status === 404) {
+          return { hasBusiness: false, business: null };
+        }
+        throw error;
       }
     },
     enabled: !!user,
+    retry: false,
   });
 
-  const businessId = businessResponse?.id || String(user?.id || ''); // Fallback
+  const hasBusiness = businessResponse?.hasBusiness || false;
+  const business = businessResponse?.business;
+  const businessId = business?.id || '';
+
+  if (businessLoading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+            <p className="text-muted-foreground mt-2">Yükleniyor...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!hasBusiness || !businessId) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-8">
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-muted-foreground mb-4">İşletme bulunamadı. Lütfen önce işletme bilgilerinizi oluşturun.</p>
+              <Button onClick={() => navigate('/business/dashboard')}>
+                Dashboard'a Dön
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
 
   // Get services
   const { data: servicesResponse, isLoading } = useQuery({

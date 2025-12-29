@@ -41,5 +41,10 @@ export const employeeService = {
     const response = await api.get(`/businesses/${businessId}/employees/${employeeId}/schedule`);
     return response.data;
   },
+
+  acceptInvitation: async (token: string): Promise<ApiResponse<any>> => {
+    const response = await api.post(`/employees/accept-invitation?token=${token}`);
+    return response.data;
+  },
 };
 

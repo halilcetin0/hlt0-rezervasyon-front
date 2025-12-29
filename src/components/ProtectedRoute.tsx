@@ -8,21 +8,15 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
-  const { user, isAuthenticated, token } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   
-  // Check if user is authenticated (check both state and localStorage as fallback)
-  const tokenFromStorage = localStorage.getItem('accessToken');
-  const userFromStorage = localStorage.getItem('user');
-  const isAuth = isAuthenticated || (!!tokenFromStorage && !!userFromStorage);
-  
-  if (!isAuth) {
+  // If not authenticated, redirect to login
+  if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
   
-  // Get user from state or localStorage
-  const currentUser = user || (userFromStorage ? JSON.parse(userFromStorage) : null);
-  
-  if (roles && currentUser && !roles.includes(currentUser.role)) {
+  // If roles are specified and user doesn't have required role, redirect to home
+  if (roles && !roles.includes(user.role)) {
     return <Navigate to="/" replace />;
   }
   

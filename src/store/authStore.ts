@@ -10,13 +10,33 @@ interface AuthState {
   updateUser: (user: User) => void;
 }
 
+// Helper to safely get from localStorage
+const getStoredToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem('accessToken');
+  } catch {
+    return null;
+  }
+};
+
+const getStoredUser = (): User | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem('user');
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+};
+
 export const useAuthStore = create<AuthState>((set) => {
-  // Initialize from localStorage
-  const storedToken = localStorage.getItem('accessToken');
-  const storedUser = localStorage.getItem('user');
+  // Initialize from localStorage only once
+  const storedToken = getStoredToken();
+  const storedUser = getStoredUser();
   
   const initialState = {
-    user: storedUser ? JSON.parse(storedUser) : null,
+    user: storedUser,
     token: storedToken,
     isAuthenticated: !!storedToken && !!storedUser,
   };
@@ -24,17 +44,29 @@ export const useAuthStore = create<AuthState>((set) => {
   return {
     ...initialState,
     setAuth: (user: User, token: string) => {
-      localStorage.setItem('accessToken', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      try {
+        localStorage.setItem('accessToken', token);
+        localStorage.setItem('user', JSON.stringify(user));
+      } catch (error) {
+        console.error('Error saving to localStorage:', error);
+      }
       set({ user, token, isAuthenticated: true });
     },
     logout: () => {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('user');
+      try {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('user');
+      } catch (error) {
+        console.error('Error removing from localStorage:', error);
+      }
       set({ user: null, token: null, isAuthenticated: false });
     },
     updateUser: (user: User) => {
-      localStorage.setItem('user', JSON.stringify(user));
+      try {
+        localStorage.setItem('user', JSON.stringify(user));
+      } catch (error) {
+        console.error('Error updating localStorage:', error);
+      }
       set({ user });
     },
   };

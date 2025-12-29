@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { NotificationBell } from '@/components/NotificationBell';
+import { CreateBusinessForm } from '@/pages/CreateBusinessForm';
 import { appointmentService } from '@/services/appointmentService';
 import { businessService } from '@/services/businessService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,11 +32,37 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { Appointment } from '@/types';
+import { Loader2 } from 'lucide-react';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function BusinessDashboard() {
   const navigate = useNavigate();
+
+  // Check if user has a business
+  const { data: businessResponse, isLoading: businessLoading } = useQuery({
+    queryKey: ['my-business'],
+    queryFn: async () => {
+      try {
+        const response = await businessService.getMyBusiness();
+        return { hasBusiness: true, business: response.data };
+      } catch (error: any) {
+        // 404 means no business exists
+        if (error.response?.status === 404) {
+          return { hasBusiness: false, business: null };
+        }
+        throw error;
+      }
+    },
+    retry: false,
+    staleTime: 0, // Always consider data stale to refetch on mount
+    refetchOnMount: true, // Always refetch when component mounts
+  });
+
+  const hasBusiness = businessResponse?.hasBusiness || false;
+
+  // IMPORTANT: All hooks must be called before any conditional returns
+  // This query will only run when hasBusiness is true
   const { data: appointmentsResponse, isLoading: appointmentsLoading, error: appointmentsError } = useQuery({
     queryKey: ['appointments'],
     queryFn: async () => {
@@ -59,7 +85,30 @@ export default function BusinessDashboard() {
     retry: false, // Don't retry on error to avoid spam
     staleTime: 30000,
     refetchOnWindowFocus: false,
+    enabled: hasBusiness, // Only fetch appointments if business exists
   });
+
+  // Show create business form if no business exists
+  if (businessLoading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+            <p className="text-muted-foreground mt-2">Yükleniyor...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!hasBusiness) {
+    return (
+      <Layout>
+        <CreateBusinessForm />
+      </Layout>
+    );
+  }
 
   const appointments = appointmentsResponse?.data || [];
 

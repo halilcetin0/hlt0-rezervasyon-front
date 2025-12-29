@@ -135,9 +135,20 @@ export default function Login() {
         toast.error('Token alınamadı');
       }
     } catch (error: any) {
-      console.error('Login error:', error);
-      console.error('Error response:', error.response?.data);
+      if (import.meta.env.DEV) {
+        console.error('Login error:', error);
+        console.error('Error response:', error.response?.data);
+      }
       
+      // Handle network errors
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error' || error.code === 'ERR_CONNECTION_REFUSED') {
+        toast.error('Sunucuya bağlanılamıyor. Lütfen backend sunucusunun çalıştığından emin olun.', {
+          duration: 5000,
+        });
+        return;
+      }
+      
+      // Handle other errors
       const errorMessage = error.response?.data?.message || error.message || 'Giriş başarısız';
       toast.error(errorMessage);
       

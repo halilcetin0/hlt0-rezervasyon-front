@@ -14,6 +14,15 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Business } from '@/types';
 
+const BUSINESS_TYPES = [
+  { value: 'SALON', label: 'Güzellik Salonu' },
+  { value: 'CLINIC', label: 'Klinik' },
+  { value: 'STUDIO', label: 'Stüdyo' },
+  { value: 'SPA', label: 'Spa' },
+  { value: 'GYM', label: 'Spor Salonu' },
+  { value: 'OTHER', label: 'Diğer' },
+];
+
 const businessSchema = z.object({
   name: z.string().min(2, 'İsim en az 2 karakter olmalıdır'),
   description: z.string().optional(),
@@ -38,23 +47,22 @@ export default function BusinessProfile() {
     queryKey: ['my-business'],
     queryFn: async () => {
       try {
-        // Try /businesses/me first
-        try {
-          const response = await businessService.getMyBusiness();
-          return response.data;
-        } catch (error: any) {
-          // Fallback: get all businesses and find by ownerId
-          const businesses = await businessService.getBusinesses();
-          return businesses.data?.find((b: Business) => b.ownerId === user?.id) || businesses.data?.[0];
-        }
+        const response = await businessService.getMyBusiness();
+        return { hasBusiness: true, business: response.data };
       } catch (error: any) {
-        return null;
+        // 404 means no business exists
+        if (error.response?.status === 404) {
+          return { hasBusiness: false, business: null };
+        }
+        throw error;
       }
     },
     enabled: !!user,
+    retry: false,
   });
 
-  const business = businessResponse;
+  const hasBusiness = businessResponse?.hasBusiness || false;
+  const business = businessResponse?.business;
 
   const {
     register,
@@ -106,14 +114,14 @@ export default function BusinessProfile() {
     );
   }
 
-  if (!business) {
+  if (!hasBusiness || !business) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-8">
           <Card>
             <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">İşletme bulunamadı</p>
-              <Button className="mt-4" onClick={() => navigate('/business/dashboard')}>
+              <p className="text-muted-foreground mb-4">İşletme bulunamadı. Lütfen önce işletme bilgilerinizi oluşturun.</p>
+              <Button onClick={() => navigate('/business/dashboard')}>
                 Dashboard'a Dön
               </Button>
             </CardContent>
@@ -162,7 +170,18 @@ export default function BusinessProfile() {
 
                 <div className="space-y-2">
                   <Label htmlFor="businessType">İşletme Türü *</Label>
-                  <Input id="businessType" {...register('businessType')} />
+                  <select
+                    id="businessType"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    {...register('businessType')}
+                  >
+                    <option value="">Seçiniz...</option>
+                    {BUSINESS_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
                   {errors.businessType && (
                     <p className="text-sm text-destructive">{errors.businessType.message}</p>
                   )}

@@ -34,8 +34,8 @@ export function BookingModal({ businessId }: BookingModalProps) {
     queryFn: () => businessService.getBusinessEmployees(businessId),
   });
 
-  const selectedServiceData = servicesResponse?.data?.find((s: any) => s.id === selectedService);
-  const selectedEmployeeData = employeesResponse?.data?.find((e: any) => e.id === selectedEmployee);
+  const selectedServiceData = servicesResponse?.find((s: any) => s.id === selectedService);
+  const selectedEmployeeData = employeesResponse?.find((e: any) => e.id === selectedEmployee);
 
   const { data: availableSlotsResponse, isLoading: loadingSlots } = useQuery({
     queryKey: ['available-slots', selectedEmployee, selectedDate, selectedServiceData?.duration],
@@ -48,7 +48,7 @@ export function BookingModal({ businessId }: BookingModalProps) {
     enabled: !!selectedEmployee && !!selectedDate && !!selectedServiceData,
   });
 
-  const availableSlots = availableSlotsResponse?.data || [];
+  const availableSlots = availableSlotsResponse || [];
 
   const bookingMutation = useMutation({
     mutationFn: appointmentService.createAppointment,
@@ -58,7 +58,7 @@ export function BookingModal({ businessId }: BookingModalProps) {
       navigate('/dashboard');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Randevu alınamadı');
+      toast.error(error.message || 'Randevu alınamadı');
     },
   });
 
@@ -84,8 +84,8 @@ export function BookingModal({ businessId }: BookingModalProps) {
     });
   };
 
-  const services = servicesResponse?.data || [];
-  const employees = employeesResponse?.data || [];
+  const services = servicesResponse || [];
+  const employees = employeesResponse || [];
 
   // Generate next 30 days for date selection
   const dates = Array.from({ length: 30 }, (_, i) => {

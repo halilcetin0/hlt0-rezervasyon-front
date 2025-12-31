@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -47,8 +48,9 @@ export default function BusinessProfile() {
     queryKey: ['my-business'],
     queryFn: async () => {
       try {
-        const response = await businessService.getMyBusiness();
-        return { hasBusiness: true, business: response.data };
+        // businessService.getMyBusiness() now returns Business directly (after interceptor)
+        const business = await businessService.getMyBusiness();
+        return { hasBusiness: true, business };
       } catch (error: any) {
         // 404 means no business exists
         if (error.response?.status === 404) {
@@ -59,6 +61,8 @@ export default function BusinessProfile() {
     },
     enabled: !!user,
     retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes - prevent unnecessary refetches
+    refetchOnWindowFocus: false, // Prevent refetch on window focus
   });
 
   const hasBusiness = businessResponse?.hasBusiness || false;
@@ -71,29 +75,44 @@ export default function BusinessProfile() {
     reset,
   } = useForm<BusinessFormData>({
     resolver: zodResolver(businessSchema),
-    values: business ? {
-      name: business.name || '',
-      description: business.description || '',
-      address: business.address || '',
-      city: business.city || '',
-      category: business.category || '',
-      businessType: business.businessType || '',
-      phone: business.phone || '',
-      email: business.email || '',
-      imageUrl: business.imageUrl || '',
-    } : undefined,
   });
 
+  // Reset form when business data is loaded
+  useEffect(() => {
+    if (business) {
+      reset({
+        name: business.name || '',
+        description: business.description || '',
+        address: business.address || '',
+        city: business.city || '',
+        category: business.category || '',
+        businessType: business.businessType || '',
+        phone: business.phone || '',
+        email: business.email || '',
+        imageUrl: business.imageUrl || '',
+      });
+    }
+  }, [business, reset]);
+
   const updateMutation = useMutation({
-    mutationFn: (data: BusinessFormData) => businessService.updateBusiness(String(business.id), data),
+    mutationFn: (data: BusinessFormData) => {
+      if (!business?.id) {
+        throw new Error('İşletme ID bulunamadı');
+      }
+      return businessService.updateBusiness(String(business.id), data);
+    },
     onSuccess: () => {
+      // Invalidate and refetch to get updated data
       queryClient.invalidateQueries({ queryKey: ['my-business'] });
       queryClient.invalidateQueries({ queryKey: ['businesses'] });
       toast.success('İşletme profili başarıyla güncellendi');
-      navigate('/business/dashboard');
+      // Small delay to ensure query is updated
+      setTimeout(() => {
+        navigate('/business/dashboard');
+      }, 100);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Profil güncellenemedi');
+      toast.error(error.message || 'Profil güncellenemedi');
     },
   });
 
@@ -114,7 +133,8 @@ export default function BusinessProfile() {
     );
   }
 
-  if (!hasBusiness || !business) {
+  // Only show error if not loading and definitely no business
+  if (!isLoading && (!hasBusiness || !business)) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-8">
@@ -126,6 +146,20 @@ export default function BusinessProfile() {
               </Button>
             </CardContent>
           </Card>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Don't render form if business is not loaded yet
+  if (isLoading || !business) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+            <p className="text-muted-foreground mt-2">Yükleniyor...</p>
+          </div>
         </div>
       </Layout>
     );

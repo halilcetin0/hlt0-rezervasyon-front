@@ -18,6 +18,8 @@ export function Layout({ children }: LayoutProps) {
       // Kullanıcı giriş yapmışsa, rolüne göre dashboard'a yönlendir
       if (user.role === 'BUSINESS_OWNER') {
         navigate('/business/dashboard');
+      } else if (user.role === 'STAFF') {
+        navigate('/staff/dashboard');
       } else {
         navigate('/dashboard');
       }
@@ -32,7 +34,15 @@ export function Layout({ children }: LayoutProps) {
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link 
-            to={isAuthenticated && user ? (user.role === 'BUSINESS_OWNER' ? '/business/dashboard' : '/dashboard') : '/'} 
+            to={
+              isAuthenticated && user 
+                ? user.role === 'BUSINESS_OWNER' 
+                  ? '/business/dashboard' 
+                  : user.role === 'STAFF'
+                  ? '/staff/dashboard'
+                  : '/dashboard'
+                : '/'
+            } 
             onClick={handleLogoClick}
             className="text-2xl font-bold text-primary cursor-pointer hover:opacity-80 transition-opacity"
           >

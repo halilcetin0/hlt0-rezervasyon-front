@@ -32,13 +32,14 @@ export default function EmployeeManagement() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [showForm, setShowForm] = useState(false);
 
+  // IMPORTANT: All hooks must be called before any conditional returns
   // Get user's business
   const { data: businessResponse, isLoading: businessLoading } = useQuery({
     queryKey: ['my-business'],
     queryFn: async () => {
       try {
-        const response = await businessService.getMyBusiness();
-        return { hasBusiness: true, business: response.data };
+        const business = await businessService.getMyBusiness();
+        return { hasBusiness: true, business };
       } catch (error: any) {
         // 404 means no business exists
         if (error.response?.status === 404) {
@@ -55,6 +56,74 @@ export default function EmployeeManagement() {
   const business = businessResponse?.business;
   const businessId = business?.id || '';
 
+  // Get employees - enabled only if business exists
+  const { data: employeesResponse, isLoading } = useQuery({
+    queryKey: ['employees', businessId],
+    queryFn: () => employeeService.getEmployees(businessId),
+    enabled: !!businessId && hasBusiness,
+  });
+
+  // Ensure employees is always an array
+  let employees: Employee[] = [];
+  if (Array.isArray(employeesResponse)) {
+    employees = employeesResponse;
+  } else if (employeesResponse?.content && Array.isArray(employeesResponse.content)) {
+    employees = employeesResponse.content;
+  } else if (employeesResponse?.data && Array.isArray(employeesResponse.data)) {
+    employees = employeesResponse.data;
+  }
+
+  // Form hook - must be called before any returns
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<EmployeeFormData>({
+    resolver: zodResolver(employeeSchema),
+  });
+
+  // Mutations - must be called before any returns
+  const createMutation = useMutation({
+    mutationFn: (data: EmployeeFormData) => employeeService.createEmployee(businessId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees', businessId] });
+      toast.success('Çalışan başarıyla eklendi');
+      reset();
+      setShowForm(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Çalışan eklenemedi');
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: EmployeeFormData) =>
+      employeeService.updateEmployee(businessId, editingEmployee!.id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees', businessId] });
+      toast.success('Çalışan başarıyla güncellendi');
+      reset();
+      setEditingEmployee(null);
+      setShowForm(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Çalışan güncellenemedi');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (employeeId: string) => employeeService.deleteEmployee(businessId, employeeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees', businessId] });
+      toast.success('Çalışan başarıyla silindi');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Çalışan silinemedi');
+    },
+  });
+
+  // Now we can do conditional returns after all hooks are called
   if (businessLoading) {
     return (
       <Layout>
@@ -84,63 +153,6 @@ export default function EmployeeManagement() {
       </Layout>
     );
   }
-
-  // Get employees
-  const { data: employeesResponse, isLoading } = useQuery({
-    queryKey: ['employees', businessId],
-    queryFn: () => employeeService.getEmployees(businessId),
-    enabled: !!businessId,
-  });
-
-  const employees = employeesResponse?.data || [];
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm<EmployeeFormData>({
-    resolver: zodResolver(employeeSchema),
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (data: EmployeeFormData) => employeeService.createEmployee(businessId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees', businessId] });
-      toast.success('Çalışan başarıyla eklendi');
-      reset();
-      setShowForm(false);
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Çalışan eklenemedi');
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: (data: EmployeeFormData) =>
-      employeeService.updateEmployee(businessId, editingEmployee!.id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees', businessId] });
-      toast.success('Çalışan başarıyla güncellendi');
-      reset();
-      setEditingEmployee(null);
-      setShowForm(false);
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Çalışan güncellenemedi');
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (employeeId: string) => employeeService.deleteEmployee(businessId, employeeId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees', businessId] });
-      toast.success('Çalışan başarıyla silindi');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Çalışan silinemedi');
-    },
-  });
 
   const onSubmit = (data: EmployeeFormData) => {
     if (editingEmployee) {

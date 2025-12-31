@@ -33,6 +33,8 @@ export default function Login() {
     if (isAuthenticated && user) {
       if (user.role === 'BUSINESS_OWNER') {
         navigate('/business/dashboard', { replace: true });
+      } else if (user.role === 'STAFF') {
+        navigate('/staff/dashboard', { replace: true });
       } else {
         navigate('/dashboard', { replace: true });
       }
@@ -50,90 +52,65 @@ export default function Login() {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
+      // Backend response format (after interceptor):
+      // { accessToken: "...", refreshToken: "...", tokenType: "Bearer" }
       const response = await authService.login(data);
       
-      // Backend response format:
-      // { success: true, message: "...", data: { accessToken: "...", refreshToken: "...", tokenType: "Bearer" }, timestamp: "..." }
+      // Get token from accessToken field
+      const token = response.accessToken || response.token;
       
-      let token: string | null = null;
-      let user: User | null = null;
-      
-      if (response.success && response.data) {
-        // Get token from accessToken field
-        token = response.data.accessToken || response.data.token;
-        
-        // If user info is in response, use it; otherwise decode from token
-        if (response.data.user) {
-          user = response.data.user;
-        } else if (token) {
-          // Decode user info from JWT token
-          const tokenUser = getUserFromToken(token);
-          if (tokenUser) {
-            // Create User object from token data
-            // Note: We need to fetch full user details or use token data
-            // For now, we'll create a minimal user object
-            user = {
-              id: tokenUser.id,
-              email: tokenUser.email,
-              fullName: data.email.split('@')[0], // Temporary, should fetch from API
-              phone: '', // Will be updated when we fetch user details
-              role: tokenUser.role as 'CUSTOMER' | 'BUSINESS_OWNER' | 'STAFF',
-              emailVerified: true, // Assume verified if token is issued
-            };
-          }
-        }
-      }
-      
-      if (token) {
-        // Try to fetch full user details from API
-        let fullUser = user;
-        try {
-          // Temporarily set token to fetch user
-          localStorage.setItem('accessToken', token);
-          const userResponse = await authService.getCurrentUser();
-          if (userResponse.success && userResponse.data) {
-            fullUser = userResponse.data;
-          }
-        } catch (error) {
-          console.warn('Could not fetch user details, using token data:', error);
-          // If fetching fails, use the user from token
-        }
-
-        // If we still don't have user, create from token
-        if (!fullUser && token) {
-          const tokenUser = getUserFromToken(token);
-          if (tokenUser) {
-            fullUser = {
-              id: tokenUser.id,
-              email: tokenUser.email,
-              fullName: data.email.split('@')[0],
-              phone: '',
-              role: tokenUser.role as 'CUSTOMER' | 'BUSINESS_OWNER' | 'STAFF',
-              emailVerified: true,
-            };
-          }
-        }
-
-        if (fullUser) {
-          setAuth(fullUser, token);
-          toast.success('Giriş başarılı!');
-          
-          // Use window.location for reliable navigation after auth state update
-          setTimeout(() => {
-            if (fullUser!.role === 'BUSINESS_OWNER') {
-              window.location.href = '/business/dashboard';
-            } else {
-              window.location.href = '/dashboard';
-            }
-          }, 100);
-        } else {
-          console.error('Login response structure:', JSON.stringify(response, null, 2));
-          toast.error('Kullanıcı bilgileri alınamadı');
-        }
-      } else {
+      if (!token) {
         console.error('Login response structure:', JSON.stringify(response, null, 2));
         toast.error('Token alınamadı');
+        return;
       }
+
+      // Decode user info from JWT token
+      const tokenUser = getUserFromToken(token);
+      if (!tokenUser) {
+        console.error('Token decode failed');
+        toast.error('Kullanıcı bilgileri alınamadı');
+        return;
+      }
+
+      // Create initial user object from token
+      let fullUser: User = {
+        id: tokenUser.id,
+        email: tokenUser.email,
+        fullName: data.email.split('@')[0], // Temporary, will be updated from API
+        phone: '',
+        role: tokenUser.role as 'CUSTOMER' | 'BUSINESS_OWNER' | 'STAFF',
+        emailVerified: true, // Assume verified if token is issued
+      };
+
+      // Try to fetch full user details from API
+      try {
+        // Temporarily set token to fetch user
+        localStorage.setItem('accessToken', token);
+        const userResponse = await authService.getCurrentUser();
+        // userResponse is already the User object (after interceptor)
+        if (userResponse) {
+          fullUser = userResponse;
+        }
+      } catch (error) {
+        console.warn('Could not fetch user details, using token data:', error);
+        // If fetching fails, use the user from token
+      }
+
+      // Set auth and redirect
+      setAuth(fullUser, token);
+      toast.success('Giriş başarılı!');
+      
+      // Use window.location for reliable navigation after auth state update
+      setTimeout(() => {
+        if (fullUser.role === 'BUSINESS_OWNER') {
+          window.location.href = '/business/dashboard';
+        } else if (fullUser.role === 'STAFF') {
+          window.location.href = '/staff/dashboard';
+        } else {
+          window.location.href = '/dashboard';
+        }
+      }, 100);
     } catch (error: any) {
       if (import.meta.env.DEV) {
         console.error('Login error:', error);
@@ -149,7 +126,7 @@ export default function Login() {
       }
       
       // Handle other errors
-      const errorMessage = error.response?.data?.message || error.message || 'Giriş başarısız';
+      const errorMessage = error.message || 'Giriş başarısız';
       toast.error(errorMessage);
       
       if (errorMessage.toLowerCase().includes('not verified') || errorMessage.toLowerCase().includes('email') || errorMessage.toLowerCase().includes('doğrulanmamış')) {
@@ -166,7 +143,7 @@ export default function Login() {
       await authService.resendVerification(emailForResend);
       toast.success('Doğrulama e-postası gönderildi!');
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Doğrulama e-postası gönderilemedi');
+      toast.error(error.message || 'Doğrulama e-postası gönderilemedi');
     }
   };
 

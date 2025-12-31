@@ -15,6 +15,8 @@ export default function Home() {
     if (isAuthenticated && user) {
       if (user.role === 'BUSINESS_OWNER') {
         navigate('/business/dashboard', { replace: true });
+      } else if (user.role === 'STAFF') {
+        navigate('/staff/dashboard', { replace: true });
       } else {
         navigate('/dashboard', { replace: true });
       }

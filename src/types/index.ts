@@ -1,12 +1,31 @@
 export type UserRole = 'CUSTOMER' | 'BUSINESS_OWNER' | 'STAFF';
 
 export interface User {
-  id: string;
+  id: string | number;
   fullName: string;
   email: string;
-  phone: string;
+  phone?: string;
   role: UserRole;
   emailVerified: boolean;
+}
+
+export interface UserResponse {
+  id: number;
+  email: string;
+  fullName: string;
+  phone?: string;
+  role: 'CUSTOMER' | 'BUSINESS_OWNER' | 'STAFF';
+  emailVerified: boolean;
+}
+
+export interface UpdateUserRequest {
+  fullName?: string;
+  phone?: string;
+}
+
+export interface UpdatePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
 }
 
 export interface Business {
@@ -49,14 +68,16 @@ export interface Employee {
 }
 
 export interface Appointment {
-  id: string;
-  customerId: string;
-  businessId: string;
-  serviceId: string;
-  employeeId: string;
+  id: string | number;
+  customerId: string | number;
+  businessId: string | number;
+  serviceId: string | number;
+  employeeId: string | number;
   appointmentDate: string;
   status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
   notes?: string;
+  ownerApproved?: boolean | null;
+  employeeApproved?: boolean | null;
   createdAt: string;
   updatedAt: string;
   customer?: User;
@@ -79,11 +100,33 @@ export interface Review {
   id: string;
   appointmentId: string;
   customerId: string;
+  customerName?: string;
   businessId: string;
+  employeeId?: string;
+  employeeName?: string;
   rating: number;
   comment?: string;
   createdAt: string;
   customer?: User;
+}
+
+export interface ReviewRequest {
+  appointmentId: number;
+  rating: number; // 1-5
+  comment?: string;
+}
+
+export interface ReviewResponse {
+  id: number;
+  appointmentId: number;
+  customerId: number;
+  customerName: string;
+  businessId: number;
+  employeeId?: number;
+  employeeName?: string;
+  rating: number;
+  comment?: string;
+  createdAt: string;
 }
 
 export interface ApiResponse<T> {
@@ -107,8 +150,9 @@ export interface RegisterRequest {
 }
 
 export interface LoginResponse {
-  token: string;
-  user: User;
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
 }
 
 

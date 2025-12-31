@@ -24,22 +24,16 @@ export default function AcceptInvitation() {
 
     const acceptInvitation = async () => {
       try {
-        const response = await employeeService.acceptInvitation(token);
-        if (response.success) {
-          setStatus('success');
-          setMessage('Davet başarıyla kabul edildi! Giriş yapabilirsiniz.');
-          toast.success('Davet başarıyla kabul edildi!');
-          setTimeout(() => {
-            navigate('/login');
-          }, 3000);
-        } else {
-          setStatus('error');
-          setMessage(response.message || 'Davet kabul edilemedi.');
-          toast.error(response.message || 'Davet kabul edilemedi.');
-        }
+        await employeeService.acceptInvitation(token);
+        setStatus('success');
+        setMessage('Davet başarıyla kabul edildi! Giriş yapabilirsiniz.');
+        toast.success('Davet başarıyla kabul edildi!');
+        setTimeout(() => {
+          navigate('/login');
+        }, 3000);
       } catch (error: any) {
         setStatus('error');
-        const errorMessage = error.response?.data?.message || 'Davet kabul edilemedi.';
+          const errorMessage = error.message || 'Davet kabul edilemedi.';
         setMessage(errorMessage);
         toast.error(errorMessage);
       }
@@ -90,4 +84,5 @@ export default function AcceptInvitation() {
     </div>
   );
 }
+
 

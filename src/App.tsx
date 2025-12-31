@@ -14,6 +14,11 @@ import ServiceManagement from '@/pages/ServiceManagement';
 import EmployeeManagement from '@/pages/EmployeeManagement';
 import BusinessProfile from '@/pages/BusinessProfile';
 import AcceptInvitation from '@/pages/AcceptInvitation';
+import StaffDashboard from '@/pages/StaffDashboard';
+import AppointmentDetails from '@/pages/AppointmentDetails';
+import CreateReview from '@/pages/CreateReview';
+import UserProfile from '@/pages/UserProfile';
+import Favorites from '@/pages/Favorites';
 
 function App() {
   return (
@@ -37,6 +42,46 @@ function App() {
         element={
           <ProtectedRoute roles={['CUSTOMER']}>
             <CustomerDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/appointments/:id"
+        element={
+          <ProtectedRoute>
+            <AppointmentDetails />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/appointments/:id/review"
+        element={
+          <ProtectedRoute roles={['CUSTOMER']}>
+            <CreateReview />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <UserProfile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/favorites"
+        element={
+          <ProtectedRoute roles={['CUSTOMER']}>
+            <Favorites />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/staff/dashboard"
+        element={
+          <ProtectedRoute roles={['STAFF']}>
+            <StaffDashboard />
           </ProtectedRoute>
         }
       />

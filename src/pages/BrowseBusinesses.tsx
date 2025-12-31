@@ -25,7 +25,7 @@ export default function BrowseBusinesses() {
       }),
   });
 
-  const businesses = businessesResponse?.data || [];
+  const businesses = businessesResponse || [];
 
   return (
     <Layout>

@@ -44,8 +44,8 @@ export default function BusinessDashboard() {
     queryKey: ['my-business'],
     queryFn: async () => {
       try {
-        const response = await businessService.getMyBusiness();
-        return { hasBusiness: true, business: response.data };
+        const business = await businessService.getMyBusiness();
+        return { hasBusiness: true, business };
       } catch (error: any) {
         // 404 means no business exists
         if (error.response?.status === 404) {
@@ -74,12 +74,7 @@ export default function BusinessDashboard() {
           console.warn('Error fetching appointments:', error.response?.data || error.message);
         }
         // Return empty array on error - don't throw to prevent query failure
-        return { 
-          success: false, 
-          data: [], 
-          message: error.response?.data?.message || error.message || 'Failed to fetch appointments', 
-          timestamp: new Date().toISOString() 
-        };
+        return [];
       }
     },
     retry: false, // Don't retry on error to avoid spam
@@ -110,7 +105,15 @@ export default function BusinessDashboard() {
     );
   }
 
-  const appointments = appointmentsResponse?.data || [];
+  // Ensure appointments is always an array
+  let appointments: Appointment[] = [];
+  if (Array.isArray(appointmentsResponse)) {
+    appointments = appointmentsResponse;
+  } else if (appointmentsResponse?.content && Array.isArray(appointmentsResponse.content)) {
+    appointments = appointmentsResponse.content;
+  } else if (appointmentsResponse?.data && Array.isArray(appointmentsResponse.data)) {
+    appointments = appointmentsResponse.data;
+  }
 
   // Calculate stats
   const totalAppointments = appointments.length;

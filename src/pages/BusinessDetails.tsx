@@ -1,20 +1,71 @@
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { businessService } from '@/services/businessService';
+import { favoriteService } from '@/services/favoriteService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Phone, Mail, Clock, Star } from 'lucide-react';
+import { MapPin, Phone, Mail, Clock, Star, Heart } from 'lucide-react';
 import { BookingModal } from '@/components/BookingModal';
+import { useAuth } from '@/hooks/useAuth';
+import toast from 'react-hot-toast';
 
 export default function BusinessDetails() {
   const { id } = useParams<{ id: string }>();
+  const { user, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: businessResponse } = useQuery({
     queryKey: ['business', id],
     queryFn: () => businessService.getBusiness(id!),
     enabled: !!id,
   });
+
+  const { data: isFavoriteResponse } = useQuery({
+    queryKey: ['favorite', id],
+    queryFn: () => favoriteService.isFavorite(id!),
+    enabled: !!id && isAuthenticated && user?.role === 'CUSTOMER',
+  });
+
+  const addFavoriteMutation = useMutation({
+    mutationFn: (businessId: string) => favoriteService.addFavorite(businessId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['favorite', id] });
+      queryClient.invalidateQueries({ queryKey: ['favorites'] });
+      toast.success('Favorilere eklendi');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Favorilere eklenemedi');
+    },
+  });
+
+  const removeFavoriteMutation = useMutation({
+    mutationFn: (businessId: string) => favoriteService.removeFavorite(businessId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['favorite', id] });
+      queryClient.invalidateQueries({ queryKey: ['favorites'] });
+      toast.success('Favorilerden kaldırıldı');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Favorilerden kaldırılamadı');
+    },
+  });
+
+  const isFavorite = isFavoriteResponse || false;
+
+  const handleToggleFavorite = () => {
+    if (!isAuthenticated || user?.role !== 'CUSTOMER') {
+      toast.error('Favorilere eklemek için giriş yapmalısınız');
+      return;
+    }
+    if (id) {
+      if (isFavorite) {
+        removeFavoriteMutation.mutate(id);
+      } else {
+        addFavoriteMutation.mutate(id);
+      }
+    }
+  };
 
   const { data: servicesResponse } = useQuery({
     queryKey: ['business', id, 'services'],
@@ -34,10 +85,10 @@ export default function BusinessDetails() {
     enabled: !!id,
   });
 
-  const business = businessResponse?.data;
-  const services = servicesResponse?.data || [];
-  const employees = employeesResponse?.data || [];
-  const reviews = reviewsResponse?.data || [];
+  const business = businessResponse;
+  const services = servicesResponse || [];
+  const employees = employeesResponse || [];
+  const reviews = reviewsResponse || [];
 
   if (!business) {
     return (
@@ -182,6 +233,23 @@ export default function BusinessDetails() {
                 <BookingModal businessId={business.id} />
               </CardContent>
             </Card>
+            {isAuthenticated && user?.role === 'CUSTOMER' && (
+              <Card>
+                <CardContent className="pt-6">
+                  <Button
+                    variant={isFavorite ? 'default' : 'outline'}
+                    className="w-full"
+                    onClick={handleToggleFavorite}
+                    disabled={addFavoriteMutation.isPending || removeFavoriteMutation.isPending}
+                  >
+                    <Heart
+                      className={`h-4 w-4 mr-2 ${isFavorite ? 'fill-current' : ''}`}
+                    />
+                    {isFavorite ? 'Favorilerden Çıkar' : 'Favorilere Ekle'}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>

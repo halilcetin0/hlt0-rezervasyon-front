@@ -1,5 +1,5 @@
 import api from '@/lib/api';
-import { ApiResponse, Business } from '@/types';
+import { Business, Service, Employee, Review } from '@/types';
 
 export const businessService = {
   getBusinesses: async (params?: {
@@ -9,37 +9,66 @@ export const businessService = {
     businessType?: string;
     page?: number;
     size?: number;
-  }): Promise<ApiResponse<Business[]>> => {
+  }): Promise<Business[]> => {
     const response = await api.get('/businesses', { params });
-    return response.data;
+    // Handle pagination if needed
+    if (response.data && Array.isArray(response.data)) {
+      return response.data;
+    }
+    // If backend returns paginated response
+    if (response.data?.content) {
+      return response.data.content;
+    }
+    return response.data || [];
   },
 
-  getBusiness: async (id: string): Promise<ApiResponse<Business>> => {
+  getBusiness: async (id: string): Promise<Business> => {
     const response = await api.get(`/businesses/${id}`);
     return response.data;
   },
 
-  updateBusiness: async (id: string, data: Partial<Business>): Promise<ApiResponse<Business>> => {
+  updateBusiness: async (id: string, data: Partial<Business>): Promise<Business> => {
     const response = await api.put(`/businesses/${id}`, data);
     return response.data;
   },
 
-  getBusinessServices: async (businessId: string): Promise<ApiResponse<any[]>> => {
+  getBusinessServices: async (businessId: string): Promise<Service[]> => {
     const response = await api.get(`/businesses/${businessId}/services`);
-    return response.data;
+    // Handle pagination if needed
+    if (response.data && Array.isArray(response.data)) {
+      return response.data;
+    }
+    if (response.data?.content) {
+      return response.data.content;
+    }
+    return response.data || [];
   },
 
-  getBusinessEmployees: async (businessId: string): Promise<ApiResponse<any[]>> => {
+  getBusinessEmployees: async (businessId: string): Promise<Employee[]> => {
     const response = await api.get(`/businesses/${businessId}/employees`);
-    return response.data;
+    // Handle pagination if needed
+    if (response.data && Array.isArray(response.data)) {
+      return response.data;
+    }
+    if (response.data?.content) {
+      return response.data.content;
+    }
+    return response.data || [];
   },
 
-  getBusinessReviews: async (businessId: string): Promise<ApiResponse<any[]>> => {
+  getBusinessReviews: async (businessId: string): Promise<Review[]> => {
     const response = await api.get(`/businesses/${businessId}/reviews`);
-    return response.data;
+    // Handle pagination if needed
+    if (response.data && Array.isArray(response.data)) {
+      return response.data;
+    }
+    if (response.data?.content) {
+      return response.data.content;
+    }
+    return response.data || [];
   },
 
-  getMyBusiness: async (): Promise<ApiResponse<Business>> => {
+  getMyBusiness: async (): Promise<Business> => {
     const response = await api.get('/businesses/me');
     return response.data;
   },
@@ -54,7 +83,7 @@ export const businessService = {
     phone: string;
     email: string;
     imageUrl?: string;
-  }): Promise<ApiResponse<Business>> => {
+  }): Promise<Business> => {
     const response = await api.post('/businesses', data);
     return response.data;
   },

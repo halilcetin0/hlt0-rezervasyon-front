@@ -1,10 +1,17 @@
 import api from '@/lib/api';
-import { ApiResponse, Employee } from '@/types';
+import { Employee } from '@/types';
 
 export const employeeService = {
-  getEmployees: async (businessId: string): Promise<ApiResponse<Employee[]>> => {
+  getEmployees: async (businessId: string): Promise<Employee[]> => {
     const response = await api.get(`/businesses/${businessId}/employees`);
-    return response.data;
+    // Handle pagination if needed
+    if (response.data && Array.isArray(response.data)) {
+      return response.data;
+    }
+    if (response.data?.content) {
+      return response.data.content;
+    }
+    return response.data || [];
   },
 
   createEmployee: async (businessId: string, data: {
@@ -12,17 +19,17 @@ export const employeeService = {
     email: string;
     phone?: string;
     specialization?: string;
-  }): Promise<ApiResponse<Employee>> => {
+  }): Promise<Employee> => {
     const response = await api.post(`/businesses/${businessId}/employees`, data);
     return response.data;
   },
 
-  updateEmployee: async (businessId: string, employeeId: string, data: Partial<Employee>): Promise<ApiResponse<Employee>> => {
+  updateEmployee: async (businessId: string, employeeId: string, data: Partial<Employee>): Promise<Employee> => {
     const response = await api.put(`/businesses/${businessId}/employees/${employeeId}`, data);
     return response.data;
   },
 
-  deleteEmployee: async (businessId: string, employeeId: string): Promise<ApiResponse<void>> => {
+  deleteEmployee: async (businessId: string, employeeId: string): Promise<void> => {
     const response = await api.delete(`/businesses/${businessId}/employees/${employeeId}`);
     return response.data;
   },
@@ -32,17 +39,17 @@ export const employeeService = {
     startTime: string;
     endTime: string;
     isAvailable: boolean;
-  }[]): Promise<ApiResponse<any>> => {
+  }[]): Promise<any> => {
     const response = await api.post(`/businesses/${businessId}/employees/${employeeId}/schedule`, { schedules });
     return response.data;
   },
 
-  getSchedule: async (businessId: string, employeeId: string): Promise<ApiResponse<any>> => {
+  getSchedule: async (businessId: string, employeeId: string): Promise<any> => {
     const response = await api.get(`/businesses/${businessId}/employees/${employeeId}/schedule`);
     return response.data;
   },
 
-  acceptInvitation: async (token: string): Promise<ApiResponse<any>> => {
+  acceptInvitation: async (token: string): Promise<any> => {
     const response = await api.post(`/employees/accept-invitation?token=${token}`);
     return response.data;
   },

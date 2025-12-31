@@ -32,13 +32,14 @@ export default function ServiceManagement() {
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [showForm, setShowForm] = useState(false);
 
+  // IMPORTANT: All hooks must be called before any conditional returns
   // Get user's business
   const { data: businessResponse, isLoading: businessLoading } = useQuery({
     queryKey: ['my-business'],
     queryFn: async () => {
       try {
-        const response = await businessService.getMyBusiness();
-        return { hasBusiness: true, business: response.data };
+        const business = await businessService.getMyBusiness();
+        return { hasBusiness: true, business };
       } catch (error: any) {
         // 404 means no business exists
         if (error.response?.status === 404) {
@@ -55,6 +56,78 @@ export default function ServiceManagement() {
   const business = businessResponse?.business;
   const businessId = business?.id || '';
 
+  // Get services - enabled only if business exists
+  const { data: servicesResponse, isLoading } = useQuery({
+    queryKey: ['services', businessId],
+    queryFn: () => serviceService.getServices(businessId),
+    enabled: !!businessId && hasBusiness,
+  });
+
+  // Ensure services is always an array
+  let services: Service[] = [];
+  if (Array.isArray(servicesResponse)) {
+    services = servicesResponse;
+  } else if (servicesResponse?.content && Array.isArray(servicesResponse.content)) {
+    services = servicesResponse.content;
+  } else if (servicesResponse?.data && Array.isArray(servicesResponse.data)) {
+    services = servicesResponse.data;
+  }
+
+  // Form hook - must be called before any returns
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<ServiceFormData>({
+    resolver: zodResolver(serviceSchema),
+    defaultValues: {
+      duration: 30,
+      price: 0,
+    },
+  });
+
+  // Mutations - must be called before any returns
+  const createMutation = useMutation({
+    mutationFn: (data: ServiceFormData) => serviceService.createService(businessId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['services', businessId] });
+      toast.success('Hizmet başarıyla eklendi');
+      reset();
+      setShowForm(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Hizmet eklenemedi');
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: ServiceFormData) =>
+      serviceService.updateService(businessId, editingService!.id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['services', businessId] });
+      toast.success('Hizmet başarıyla güncellendi');
+      reset();
+      setEditingService(null);
+      setShowForm(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Hizmet güncellenemedi');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (serviceId: string) => serviceService.deleteService(businessId, serviceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['services', businessId] });
+      toast.success('Hizmet başarıyla silindi');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Hizmet silinemedi');
+    },
+  });
+
+  // Now we can do conditional returns after all hooks are called
   if (businessLoading) {
     return (
       <Layout>
@@ -84,67 +157,6 @@ export default function ServiceManagement() {
       </Layout>
     );
   }
-
-  // Get services
-  const { data: servicesResponse, isLoading } = useQuery({
-    queryKey: ['services', businessId],
-    queryFn: () => serviceService.getServices(businessId),
-    enabled: !!businessId,
-  });
-
-  const services = servicesResponse?.data || [];
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm<ServiceFormData>({
-    resolver: zodResolver(serviceSchema),
-    defaultValues: {
-      duration: 30,
-      price: 0,
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (data: ServiceFormData) => serviceService.createService(businessId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services', businessId] });
-      toast.success('Hizmet başarıyla eklendi');
-      reset();
-      setShowForm(false);
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Hizmet eklenemedi');
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: (data: ServiceFormData) =>
-      serviceService.updateService(businessId, editingService!.id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services', businessId] });
-      toast.success('Hizmet başarıyla güncellendi');
-      reset();
-      setEditingService(null);
-      setShowForm(false);
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Hizmet güncellenemedi');
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (serviceId: string) => serviceService.deleteService(businessId, serviceId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services', businessId] });
-      toast.success('Hizmet başarıyla silindi');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Hizmet silinemedi');
-    },
-  });
 
   const onSubmit = (data: ServiceFormData) => {
     if (editingService) {

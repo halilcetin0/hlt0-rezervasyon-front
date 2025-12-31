@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { NotificationBell } from '@/components/NotificationBell';
 import { appointmentService } from '@/services/appointmentService';
@@ -8,15 +8,19 @@ import { businessService } from '@/services/businessService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Calendar, Clock, MapPin, Search, Star, Heart } from 'lucide-react';
+import { Calendar, Clock, MapPin, Search, Star, Heart, X, Eye } from 'lucide-react';
 import { format } from 'date-fns';
+import { tr } from 'date-fns/locale';
 import { Appointment, Business } from '@/types';
+import toast from 'react-hot-toast';
 
 export default function CustomerDashboard() {
   const [appointmentFilter, setAppointmentFilter] = useState<'all' | 'upcoming' | 'past'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const { data: appointmentsResponse, isLoading: appointmentsLoading, error: appointmentsError } = useQuery({
+  const { data: appointments, isLoading: appointmentsLoading, error: appointmentsError } = useQuery({
     queryKey: ['appointments', appointmentFilter],
     queryFn: async () => {
       try {
@@ -24,15 +28,10 @@ export default function CustomerDashboard() {
       } catch (error: any) {
         // Only log in development
         if (import.meta.env.DEV) {
-          console.warn('Error fetching appointments:', error.response?.data || error.message);
+          console.warn('Error fetching appointments:', error.message);
         }
         // Return empty array on error - don't throw to prevent query failure
-        return { 
-          success: false, 
-          data: [], 
-          message: error.response?.data?.message || error.message || 'Failed to fetch appointments', 
-          timestamp: new Date().toISOString() 
-        };
+        return [];
       }
     },
     retry: false, // Don't retry on error to avoid spam
@@ -51,12 +50,7 @@ export default function CustomerDashboard() {
           console.warn('Error fetching businesses:', error.response?.data || error.message);
         }
         // Return empty array on error - don't throw to prevent query failure
-        return { 
-          success: false, 
-          data: [], 
-          message: error.response?.data?.message || error.message || 'Failed to fetch businesses', 
-          timestamp: new Date().toISOString() 
-        };
+        return [];
       }
     },
     retry: false, // Don't retry on error to avoid spam
@@ -65,10 +59,36 @@ export default function CustomerDashboard() {
     enabled: !!searchTerm || true, // Only fetch when there's a search term or always
   });
 
-  const appointments = appointmentsResponse?.data || [];
-  const businesses = businessesResponse?.data || [];
+  // Ensure appointments is always an array
+  let appointmentsList: Appointment[] = [];
+  if (Array.isArray(appointments)) {
+    appointmentsList = appointments;
+  } else if (appointments?.content && Array.isArray(appointments.content)) {
+    appointmentsList = appointments.content;
+  } else if (appointments?.data && Array.isArray(appointments.data)) {
+    appointmentsList = appointments.data;
+  }
+  const businessesList = businesses || [];
 
-  const filteredAppointments = appointments.filter((apt: Appointment) => {
+  // Cancel appointment mutation
+  const cancelMutation = useMutation({
+    mutationFn: (appointmentId: string) => appointmentService.cancelAppointment(appointmentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      toast.success('Randevu başarıyla iptal edildi');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Randevu iptal edilemedi');
+    },
+  });
+
+  const handleCancel = (appointmentId: string) => {
+    if (confirm('Bu randevuyu iptal etmek istediğinizden emin misiniz?')) {
+      cancelMutation.mutate(appointmentId);
+    }
+  };
+
+  const filteredAppointments = appointmentsList.filter((apt: Appointment) => {
     const aptDate = new Date(apt.appointmentDate);
     const now = new Date();
     
@@ -156,18 +176,18 @@ export default function CustomerDashboard() {
                             <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                               <div className="flex items-center gap-1">
                                 <Calendar className="h-4 w-4" />
-                                {format(new Date(appointment.appointmentDate), 'MMM d, yyyy')}
+                                {format(new Date(appointment.appointmentDate), 'd MMMM yyyy', { locale: tr })}
                               </div>
                               <div className="flex items-center gap-1">
                                 <Clock className="h-4 w-4" />
-                                {format(new Date(appointment.appointmentDate), 'h:mm a')}
+                                {format(new Date(appointment.appointmentDate), 'HH:mm', { locale: tr })}
                               </div>
                               {appointment.employee && (
-                                <span>with {appointment.employee.name}</span>
+                                <span>ile {appointment.employee.name}</span>
                               )}
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className="flex flex-col items-end gap-2">
                             <span
                               className={`px-2 py-1 rounded text-xs font-medium ${
                                 appointment.status === 'CONFIRMED'
@@ -179,8 +199,33 @@ export default function CustomerDashboard() {
                                   : 'bg-red-100 text-red-800'
                               }`}
                             >
-                              {appointment.status}
+                              {appointment.status === 'CONFIRMED' ? 'Onaylandı' :
+                               appointment.status === 'PENDING' ? 'Beklemede' :
+                               appointment.status === 'COMPLETED' ? 'Tamamlandı' :
+                               'İptal Edildi'}
                             </span>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => navigate(`/appointments/${appointment.id}`)}
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                Detay
+                              </Button>
+                              {(appointment.status === 'PENDING' || appointment.status === 'CONFIRMED') && 
+                               new Date(appointment.appointmentDate) > new Date() && (
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleCancel(appointment.id)}
+                                  disabled={cancelMutation.isPending}
+                                >
+                                  <X className="h-4 w-4 mr-1" />
+                                  İptal Et
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -219,13 +264,13 @@ export default function CustomerDashboard() {
                       Lütfen daha sonra tekrar deneyin.
                     </p>
                   </div>
-                ) : businesses.length === 0 ? (
+                ) : businessesList.length === 0 ? (
                   <p className="text-muted-foreground text-center py-8">
                     İşletme bulunamadı
                   </p>
                 ) : (
                   <div className="grid md:grid-cols-2 gap-4">
-                    {businesses.slice(0, 4).map((business: Business) => (
+                    {businessesList.slice(0, 4).map((business: Business) => (
                     <Link key={business.id} to={`/businesses/${business.id}`}>
                       <Card className="hover:shadow-lg transition-shadow cursor-pointer">
                         <CardHeader>
@@ -268,14 +313,18 @@ export default function CustomerDashboard() {
                     İşletme Bul
                   </Button>
                 </Link>
-                <Button variant="outline" className="w-full justify-start">
-                  <Heart className="mr-2 h-4 w-4" />
-                  Favorilerim
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <Star className="mr-2 h-4 w-4" />
-                  Yorumlarım
-                </Button>
+                <Link to="/favorites">
+                  <Button variant="outline" className="w-full justify-start">
+                    <Heart className="mr-2 h-4 w-4" />
+                    Favorilerim
+                  </Button>
+                </Link>
+                <Link to="/profile">
+                  <Button variant="outline" className="w-full justify-start">
+                    <Star className="mr-2 h-4 w-4" />
+                    Profilim
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
 
